@@ -698,6 +698,93 @@ def load_data():
     finally:
         db.close()
 
+        # ============================================================
+# AUTO-DATABASE SETUP (for fresh deploy)
+# ============================================================
+import os
+
+os.makedirs("data", exist_ok=True)
+
+from app.core.database import Base, engine
+
+# Create tables if they don't exist
+Base.metadata.create_all(bind=engine)
+
+
+# ============================================================
+# AUTO-SEED DATA (if database empty)
+# ============================================================
+def _auto_seed_if_empty():
+    """Automatically seed demo data if database is empty."""
+    from app.core.database import SessionLocal
+    from app.models.user import User as UserModel
+    from app.models.account import Account as AccountModel
+    from app.models.transaction import Transaction as TransactionModel
+    import random
+    import uuid
+    from datetime import datetime, timedelta
+
+    db = SessionLocal()
+    try:
+        existing = db.query(TransactionModel).count()
+        if existing > 0:
+            return  # Already has data
+
+        # Create demo user
+        user = UserModel(
+            full_name="Demo User",
+            email="demo@intellibank.com",
+            phone="03001234567",
+            hashed_password="demo",
+            is_active=True,
+            is_admin=True,
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+        # Create 10 accounts
+        accounts = []
+        for i in range(10):
+            acc = AccountModel(
+                user_id=user.id,
+                account_number=f"ACC{10000 + i}",
+                account_type=random.choice(["savings", "current", "business"]),
+                balance=round(random.uniform(10000, 500000), 2),
+                risk_score=round(random.uniform(0.0, 0.5), 2),
+                is_blocked=False,
+            )
+            db.add(acc)
+            accounts.append(acc)
+        db.commit()
+        for acc in accounts:
+            db.refresh(acc)
+
+        # Create 200 sample transactions
+        base_time = datetime.utcnow() - timedelta(days=30)
+        for i in range(200):
+            acc = random.choice(accounts)
+            is_fraud = random.random() < 0.05  # 5% fraud
+            fraud_score = round(random.uniform(0.7, 0.99), 3) if is_fraud else round(random.uniform(0.0, 0.4), 3)
+            txn = TransactionModel(
+                transaction_id=f"TXN{uuid.uuid4().hex[:10].upper()}",
+                from_account_id=acc.id,
+                transaction_type=random.choice(["transfer", "withdrawal", "payment", "deposit"]),
+                amount=round(random.uniform(100, 100000), 2),
+                description="Auto-seeded transaction",
+                fraud_score=fraud_score,
+                is_fraud=is_fraud,
+                status="flagged" if is_fraud else "success",
+                created_at=base_time + timedelta(seconds=random.randint(0, 2592000)),
+            )
+            db.add(txn)
+        db.commit()
+    finally:
+        db.close()
+
+
+_auto_seed_if_empty()
+
 
 accounts, transactions, users = load_data()
 
