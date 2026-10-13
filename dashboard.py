@@ -350,7 +350,6 @@ st.markdown("""
         color: #ff4b4b;
     }
 
-    /* Risk gauge bar */
     .risk-bar {
         height: 6px;
         background: rgba(255, 255, 255, 0.08);
@@ -630,6 +629,58 @@ st.markdown("""
         border: none !important;
         box-shadow: 0 4px 15px rgba(0, 212, 255, 0.4) !important;
     }
+
+    /* ============================================================ */
+    /* INTELLIBOT — Floating Chat Widget CSS                        */
+    /* ============================================================ */
+    div[data-testid="stPopover"] {
+        position: fixed !important;
+        bottom: 24px !important;
+        right: 24px !important;
+        z-index: 9998 !important;
+        width: auto !important;
+    }
+
+    div[data-testid="stPopover"] > button {
+        width: 64px !important;
+        height: 64px !important;
+        border-radius: 50% !important;
+        background: linear-gradient(135deg, #00d4ff, #7b61ff) !important;
+        border: none !important;
+        color: white !important;
+        font-size: 1.6rem !important;
+        padding: 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        justify-content: center !important;
+        box-shadow: 0 8px 32px rgba(0, 212, 255, 0.5),
+                    0 0 60px rgba(123, 97, 255, 0.3) !important;
+        transition: all 0.3s ease !important;
+    }
+
+    div[data-testid="stPopover"] > button:hover {
+        transform: scale(1.1) !important;
+        box-shadow: 0 12px 40px rgba(0, 212, 255, 0.7),
+                    0 0 80px rgba(123, 97, 255, 0.5) !important;
+    }
+
+    div[data-testid="stPopover"] > button svg {
+        display: none !important;
+    }
+
+    div[data-testid="stPopoverBody"] {
+        background: linear-gradient(135deg, rgba(15, 20, 25, 0.98), rgba(10, 15, 20, 0.98)) !important;
+        backdrop-filter: blur(20px) !important;
+        border: 1px solid rgba(0, 212, 255, 0.25) !important;
+        border-radius: 16px !important;
+        box-shadow: 0 20px 60px rgba(0, 0, 0, 0.7),
+                    0 0 40px rgba(0, 212, 255, 0.15) !important;
+        padding: 16px !important;
+        width: 380px !important;
+        max-width: 90vw !important;
+        max-height: 600px !important;
+        overflow-y: auto !important;
+    }
 </style>
 """, unsafe_allow_html=True)
 
@@ -649,7 +700,6 @@ def load_data():
 
 
 accounts, transactions, users = load_data()
-
 
 # ============================================================
 # HEADER
@@ -672,6 +722,9 @@ if "page" not in st.session_state:
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
+
+if "intellibot_messages" not in st.session_state:
+    st.session_state.intellibot_messages = []
 
 
 # ============================================================
@@ -730,7 +783,6 @@ if "user" not in st.session_state:
     st.session_state.user = None
 
 if st.session_state.user is None:
-    # ===== Login Page =====
     st.markdown("""
     <div style="
         max-width: 420px;
@@ -791,14 +843,12 @@ if st.session_state.user is None:
         </div>
         """, unsafe_allow_html=True)
 
-    st.stop()  # Stop rendering rest of app
+    st.stop()
 
 
 # ============================================================
-# LOGGED IN — Show user in sidebar
+# CURRENT PAGE
 # ============================================================
-
-
 page = st.session_state.page
 
 # ============================================================
@@ -1156,8 +1206,7 @@ elif page == "Transactions":
         st.markdown("---")
         st.dataframe(df, use_container_width=True, hide_index=True, height=550)
 
-
-# ============================================================
+        # ============================================================
 # FRAUD ALERTS PAGE
 # ============================================================
 elif page == "Fraud Alerts":
@@ -1280,7 +1329,8 @@ elif page == "Fraud Alerts":
     else:
         st.success("✅ No confirmed fraud transactions at this time.")
 
-        # ============================================================
+
+# ============================================================
 # ANALYTICS PAGE
 # ============================================================
 elif page == "Analytics":
@@ -1452,6 +1502,7 @@ elif page == "Simulator":
         st.markdown("---")
         st.caption("💡 Tip: Try Rs 100,000+ at 3 AM for higher fraud scores")
 
+    # ===== SHAP Explanation =====
     st.markdown("---")
     st.markdown("### 🔍 AI Explanation (SHAP)")
     st.caption("Understand which features contributed most to the fraud prediction")
@@ -1516,8 +1567,7 @@ elif page == "Simulator":
                 st.error(f"❌ Explanation failed: {e}")
                 st.caption("Make sure the model file exists at `app/ml/models/fraud_xgb_model.joblib`")
 
-
-# ============================================================
+                # ============================================================
 # PDF ANALYSIS PAGE
 # ============================================================
 elif page == "PDF Analysis":
@@ -1713,7 +1763,8 @@ elif page == "Jarvis Chat":
             "- *Show me all fraud transactions*\n"
             "- *What is the balance of account 1?*\n"
             "- *Summarize the PDF*\n"
-            "- *What is the highest amount in the PDF?*"
+            "- *What is the highest amount in the PDF?*\n\n"
+            "🌐 *You can speak/write in English, Urdu, or Roman Urdu — I'll reply accordingly.*"
         )
         st.session_state.messages = [{"role": "assistant", "content": greeting}]
 
@@ -1728,35 +1779,43 @@ elif page == "Jarvis Chat":
     audio_data = st.audio_input("Record your command", key="jarvis_voice_mic")
 
     if audio_data is not None:
-        try:
-            from app.jarvis.voice import speech_to_text, speak
-            from app.jarvis.brain import process_query
+        audio_bytes = audio_data.read()
+        audio_hash = hash(audio_bytes)
 
-            with st.spinner("Processing your voice input..."):
-                transcript = speech_to_text(audio_data.read(), "input.wav")
+        if st.session_state.get("last_audio_hash") != audio_hash:
+            st.session_state["last_audio_hash"] = audio_hash
 
-            if transcript and not transcript.lower().startswith(("error", "speech")):
-                st.session_state.messages.append({"role": "user", "content": f"🎤 {transcript}"})
-                response = process_query(transcript)
-                st.session_state.messages.append({"role": "assistant", "content": response})
+            try:
+                from app.jarvis.voice import speech_to_text, speak, detect_language
+                from app.jarvis.brain import process_query
 
-                from app.utils.audit import log_action
-                log_action(
-                    action="jarvis_query",
-                    target="Voice Input",
-                    details=f"Q: {transcript[:80]}",
-                )
+                with st.spinner("🎧 Processing your voice input..."):
+                    transcript = speech_to_text(audio_bytes, "input.wav")
 
-                if speak_reply:
-                    try:
-                        speak(response)
-                    except Exception:
-                        pass
-                st.rerun()
-            else:
-                st.warning(f"Unable to process audio input: {transcript}")
-        except Exception as e:
-            st.error(f"❌ Voice processing error: {e}")
+                if transcript and not transcript.lower().startswith(("error", "speech")):
+                    st.session_state.messages.append({"role": "user", "content": f"🎤 {transcript}"})
+                    response = process_query(transcript, history=st.session_state.messages[:-1])
+                    st.session_state.messages.append({"role": "assistant", "content": response})
+
+                    from app.utils.audit import log_action
+                    log_action(
+                        action="jarvis_query",
+                        target="Voice Input",
+                        details=f"Q: {transcript[:80]}",
+                    )
+
+                    if speak_reply:
+                        try:
+                            lang = detect_language(response)
+                            speak(response, lang=lang)
+                        except Exception:
+                            pass
+
+                    st.rerun()
+                else:
+                    st.warning(f"⚠️ Could not process audio: {transcript}")
+            except Exception as e:
+                st.error(f"❌ Voice processing error: {e}")
 
     st.markdown("")
     st.markdown("#### 💬 Type a Message")
@@ -1765,10 +1824,10 @@ elif page == "Jarvis Chat":
     if prompt:
         try:
             from app.jarvis.brain import process_query
-            from app.jarvis.voice import speak
+            from app.jarvis.voice import speak, detect_language
 
             st.session_state.messages.append({"role": "user", "content": prompt})
-            response = process_query(prompt)
+            response = process_query(prompt, history=st.session_state.messages[:-1])
 
             from app.utils.audit import log_action
             log_action(
@@ -1781,7 +1840,8 @@ elif page == "Jarvis Chat":
 
             if speak_reply:
                 try:
-                    speak(response)
+                    lang = detect_language(response)
+                    speak(response, lang=lang)
                 except Exception:
                     pass
             st.rerun()
@@ -1843,6 +1903,7 @@ elif page == "Audit Log":
             "pdf_upload": "📄",
             "pdf_summarize": "🤖",
             "jarvis_query": "💬",
+            "intellibot_query": "🤖",
             "export": "📥",
         }
 
@@ -1875,6 +1936,146 @@ elif page == "Audit Log":
                 </div>
             </div>
             """, unsafe_allow_html=True)
+
+            # ============================================================
+# INTELLIBOT — Floating Chat Widget (Bottom-Right)
+# ============================================================
+with st.popover("🤖", help="Chat with IntelliBot"):
+    # ===== Header =====
+    st.markdown("""
+    <div style="
+        background: linear-gradient(135deg, #00d4ff 0%, #7b61ff 100%);
+        border-radius: 12px;
+        padding: 12px 16px;
+        display: flex;
+        align-items: center;
+        gap: 10px;
+        margin-bottom: 12px;
+    ">
+        <div style="
+            width: 36px; height: 36px; border-radius: 50%;
+            background: rgba(255, 255, 255, 0.2);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 1.2rem;
+        ">🤖</div>
+        <div style="flex: 1; color: white;">
+            <div style="font-size: 1rem; font-weight: 800; margin: 0;">IntelliBot</div>
+            <div style="font-size: 0.7rem; opacity: 0.9; margin: 2px 0 0 0;">🟢 Online • AI Assistant</div>
+        </div>
+    </div>
+    """, unsafe_allow_html=True)
+
+    # ===== PDF Badge =====
+    _ib_pdf_loaded = bool(st.session_state.get("pdf_text"))
+    if _ib_pdf_loaded:
+        st.markdown("""
+        <div style="
+            text-align:center;
+            background: rgba(0, 200, 83, 0.15);
+            color: #00c853;
+            padding: 4px 10px;
+            border-radius: 12px;
+            font-size: 0.7rem;
+            font-weight: 600;
+            border: 1px solid rgba(0, 200, 83, 0.4);
+            margin-bottom: 8px;
+        ">📄 PDF LOADED</div>
+        """, unsafe_allow_html=True)
+
+    # ===== Session State Init =====
+    if "intellibot_messages" not in st.session_state:
+        _ib_greeting = "👋 Hi! I'm **IntelliBot**.\n\n"
+        if _ib_pdf_loaded:
+            _ib_greeting += "📄 PDF loaded — ask me anything!\n\n"
+        _ib_greeting += "Ask about transactions, frauds, or balances."
+        st.session_state.intellibot_messages = [
+            {"role": "assistant", "content": _ib_greeting}
+        ]
+
+    if "ib_text_input" not in st.session_state:
+        st.session_state.ib_text_input = ""
+
+    # ===== Quick Prompts =====
+    _ib_q1, _ib_q2 = st.columns(2)
+    _ib_q3, _ib_q4 = st.columns(2)
+
+    _ib_prompt = None
+
+    with _ib_q1:
+        if st.button("📊 Txn", use_container_width=True, key="ib_q1"):
+            _ib_prompt = "How many transactions have been processed?"
+    with _ib_q2:
+        if st.button("🚨 Fraud", use_container_width=True, key="ib_q2"):
+            _ib_prompt = "Show me all fraud transactions"
+    with _ib_q3:
+        if st.button("💰 Balance", use_container_width=True, key="ib_q3"):
+            _ib_prompt = "What is the balance of account 1?"
+    with _ib_q4:
+        if st.button("📈 Summary", use_container_width=True, key="ib_q4"):
+            _ib_prompt = "Give me a summary of the banking system"
+
+    # ===== Chat History =====
+    st.markdown("---")
+    for _ib_msg in st.session_state.intellibot_messages[-5:]:
+        if _ib_msg["role"] == "user":
+            st.markdown(f"**👤 You:** {_ib_msg['content']}")
+        else:
+            st.markdown(f"**🤖 Bot:** {_ib_msg['content']}")
+        st.markdown("")
+
+    # ===== Input with Callback (Enter to send + auto-clear) =====
+    def _ib_submit():
+        _val = st.session_state.get("ib_text_input", "").strip()
+        if _val:
+            st.session_state["ib_pending_msg"] = _val
+            st.session_state.ib_text_input = ""
+
+    st.text_input(
+        "Ask IntelliBot...",
+        key="ib_text_input",
+        placeholder="Type and press Enter...",
+        on_change=_ib_submit,
+    )
+
+    # ===== Clear Button =====
+    if st.button("🗑️ Clear Chat", use_container_width=True, key="ib_clear_btn"):
+        st.session_state.intellibot_messages = [
+            {"role": "assistant", "content": "👋 Chat cleared."}
+        ]
+        st.rerun()
+
+    # ===== Handle Input =====
+    _ib_final = _ib_prompt or st.session_state.pop("ib_pending_msg", None)
+
+    if _ib_final:
+        try:
+            from app.jarvis.brain import process_query
+
+            st.session_state.intellibot_messages.append({
+                "role": "user",
+                "content": _ib_final,
+            })
+
+            _ib_response = process_query(
+                _ib_final,
+                history=st.session_state.intellibot_messages[:-1],
+            )
+
+            st.session_state.intellibot_messages.append({
+                "role": "assistant",
+                "content": _ib_response,
+            })
+
+            from app.utils.audit import log_action
+            log_action(
+                action="intellibot_query",
+                target="IntelliBot Widget",
+                details=f"Q: {_ib_final[:80]}",
+            )
+
+            st.rerun()
+        except Exception as _ib_err:
+            st.error(f"❌ {_ib_err}")
 
 
 # ============================================================

@@ -20,9 +20,6 @@ def get_client():
 # ------------------------------------------------------------
 # Groq supported models (as of 2026)
 # ------------------------------------------------------------
-# Primary:   openai/gpt-oss-120b   (fast + smart, recommended)
-# Fallback:  openai/gpt-oss-20b    (lighter, faster)
-# Fallback:  llama-3.1-8b-instant  (very fast, small)
 PRIMARY_MODEL = "openai/gpt-oss-120b"
 FALLBACK_MODEL = "llama-3.1-8b-instant"
 
@@ -39,7 +36,6 @@ def _chat(messages, temperature=0.7, max_tokens=800):
         )
         return response.choices[0].message.content
     except Exception as e:
-        # If primary fails, try fallback
         try:
             response = client.chat.completions.create(
                 model=FALLBACK_MODEL,
@@ -52,7 +48,7 @@ def _chat(messages, temperature=0.7, max_tokens=800):
             raise e
 
 
-def ask_llm(prompt: str, pdf_text: str = None, db_context: str = None) -> str:
+def ask_llm(prompt: str, pdf_text: str = None, db_context: str = None, history=None) -> str:
     """Send a query to Groq LLM with optional PDF and DB context."""
     system_parts = [
         "You are Jarvis, an intelligent banking assistant for IntelliBank.",
@@ -75,10 +71,17 @@ def ask_llm(prompt: str, pdf_text: str = None, db_context: str = None) -> str:
 
     system_prompt = "\n".join(system_parts)
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {"role": "user", "content": prompt}
-    ]
+    messages = [{"role": "system", "content": system_prompt}]
+
+    if history:
+        for msg in history[-6:]:
+            if msg.get("role") in ("user", "assistant"):
+                messages.append({
+                    "role": msg["role"],
+                    "content": msg["content"][:500],
+                })
+
+    messages.append({"role": "user", "content": prompt})
 
     try:
         return _chat(messages, temperature=0.7, max_tokens=800)

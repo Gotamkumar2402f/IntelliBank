@@ -14,7 +14,6 @@ def get_db_context() -> str:
         fraud_txns = db.query(Transaction).filter(Transaction.is_fraud == True).count()
         total_balance = sum(a.balance for a in db.query(Account).all())
 
-        # Recent high-risk transactions
         recent_high = (
             db.query(Transaction)
             .filter(Transaction.fraud_score >= 0.5)
@@ -39,11 +38,10 @@ def get_db_context() -> str:
         db.close()
 
 
-def process_query(query: str) -> str:
+def process_query(query: str, history=None) -> str:
     """Main Jarvis brain — LLM with rule-based fast paths."""
     q = query.lower().strip()
 
-    # Get PDF text from session (Streamlit)
     pdf_text = None
     try:
         import streamlit as st
@@ -51,11 +49,7 @@ def process_query(query: str) -> str:
     except Exception:
         pass
 
-    # ============================================================
-    # FAST RULE-BASED PATHS (offline, instant)
-    # ============================================================
-
-    # Fraud quick check
+    # Fast rule-based: fraud list
     if "fraud" in q and ("show" in q or "list" in q or "dikhao" in q):
         db = SessionLocal()
         try:
@@ -69,7 +63,7 @@ def process_query(query: str) -> str:
         finally:
             db.close()
 
-    # Account balance quick check
+    # Fast rule-based: account balance
     m = re.search(r"account\s*(\d+)", q)
     if m and "balance" in q:
         db = SessionLocal()
@@ -81,17 +75,13 @@ def process_query(query: str) -> str:
         finally:
             db.close()
 
-    # ============================================================
-    # LLM-POWERED RESPONSE (Groq)
-    # ============================================================
+    # LLM-powered response
     try:
         db_context = get_db_context()
-        return ask_llm(query, pdf_text=pdf_text, db_context=db_context)
+        return ask_llm(query, pdf_text=pdf_text, db_context=db_context, history=history)
     except Exception as e:
-        # Fallback 1: PDF summary if relevant
         if pdf_text and any(kw in q for kw in ["pdf", "document", "summarize", "summary"]):
             return summarize_pdf(pdf_text)
-        # Fallback 2: Error message
         return f"⚠️ AI service unavailable: {str(e)}"
 
 
