@@ -1,4 +1,3 @@
-$readme = @'
 # 🏦 IntelliBank
 
 **AI-Powered Intelligent Banking System with Real-Time Fraud Detection**
@@ -32,27 +31,11 @@ Traditional banking systems rely on manual fraud detection, which is slow and er
 IntelliBank detects fraud in **6 simple steps**:
 
 1. **Transaction Input** — User submits transaction details (amount, type, hour, account balance)
-
-2. **Feature Extraction** — System prepares 8 key features:
-   - Transaction amount
-   - Hour of day
-   - Night-time flag (12 AM – 6 AM)
-   - Transaction type (deposit / withdrawal / transfer)
-   - Account balance
-   - Amount-to-balance ratio
-
+2. **Feature Extraction** — System prepares 8 key features (amount, hour, night flag, type, balance, ratio)
 3. **ML Prediction** — XGBoost model predicts fraud probability between **0.0 (safe)** and **1.0 (fraud)**
-
 4. **SHAP Explanation** — System explains which features pushed the score up or down
-
-5. **Fraud Score** — Final score determines risk level:
-   - **≥ 0.5** → 🚨 Fraud Flagged
-   - **< 0.5** → ✅ Transaction Safe
-
-6. **Action** — For high-risk transactions:
-   - 📧 Email alert sent to admin
-   - 📋 Audit log entry created
-   - 🔒 Account block recommended
+5. **Fraud Score** — Score ≥ 0.5 = 🚨 Fraud Flagged, Score < 0.5 = ✅ Safe
+6. **Action** — High-risk triggers email alert, audit log, and account block recommendation
 
 ### 🎓 Academic Value
 
@@ -91,7 +74,6 @@ cd IntelliBank
 # 2. Create virtual environment
 python -m venv venv
 venv\Scripts\activate          # Windows
-# source venv/bin/activate     # Linux/Mac
 
 # 3. Install dependencies
 pip install -r requirements.txt
@@ -102,50 +84,3 @@ cp .env.example .env
 
 # 5. Run the application
 streamlit run dashboard.py
-
-🛠️ Tech Stack
-Layer	Technologies
-Backend	FastAPI, SQLAlchemy, SQLite
-Frontend	Streamlit, Plotly
-AI/ML	XGBoost, SHAP, scikit-learn, Pandas, NumPy
-LLM	Groq API (Llama 3.3 70B)
-Voice	SpeechRecognition, gTTS
-PDF	PyPDF2, pdfplumber
-Security	JWT, passlib, python-jose
-
-IntelliBank/
-│
-├── app/
-│   ├── api/                    # FastAPI endpoints
-│   ├── core/                   # Configuration & Database
-│   ├── models/                 # SQLAlchemy models
-│   ├── ml/                     # Machine Learning (XGBoost + SHAP)
-│   ├── jarvis/                 # AI Assistant (Groq LLM + Voice)
-│   ├── services/               # PDF analysis
-│   └── utils/                  # Helper functions
-│
-├── data/                       # Database files
-├── uploads/                    # Uploaded PDFs
-├── dashboard.py                # Streamlit UI
-├── requirements.txt
-├── .env.example
-├── .gitignore
-├── README.md
-└── LICENSE
-
-🎯 Use Cases
-🏦 Banking Sector: Real-time fraud detection for transactions
-
-📚 Education: ML pipeline demonstration for students
-
-🔬 Research: SHAP explainability and LLM integration
-
-💼 Portfolio: Full-stack AI project showcase
-
-👨‍💻 Author
-Gotam Kumar
-
-https://img.shields.io/badge/GitHub-181717?style=for-the-badge&logo=github&logoColor=white
-
-⭐ If you found this project helpful, please give it a star!
-Built with ❤️ as a Final Year Project
